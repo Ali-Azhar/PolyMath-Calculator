@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Multi-Mode Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #07070f;
+    --bg-1: #0e0e1f;
+    --bg-2: rgba(255,255,255,0.04);
+    --bg-3: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.09);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #f4f4f8;
+    --muted: #9aa0b4;
+    --accent: #7c5cff;
+    --accent-2: #22d3ee;
+    --accent-grad: linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%);
+    --danger: #ff5c7c;
+    --ok: #22c55e;
+    --shadow: 0 20px 60px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.3);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,0.25), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(34,211,238,0.18), transparent 55%),
+      radial-gradient(800px 600px at 50% 120%, rgba(124,92,255,0.15), transparent 60%),
+      var(--bg-0);
+    background-attachment: fixed;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  /* ========== SIDEBAR ========== */
+  .sidebar {
+    padding: 24px 16px;
+    border-right: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px 20px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  }
+  .brand .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--accent-grad);
+    display: grid; place-items: center; color: white; font-weight: 700;
+    box-shadow: 0 6px 20px rgba(124,92,255,0.4);
+  }
+  .brand .name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+  .brand .sub { font-size: 11px; color: var(--muted); }
+  .nav-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; padding: 8px 10px 4px; }
+  .tab {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border: none; background: transparent; color: var(--muted);
+    border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500;
+    width: 100%; text-align: left; transition: all 0.15s ease;
+    font-family: inherit;
+  }
+  .tab:hover { background: var(--bg-2); color: var(--text); }
+  .tab.active {
+    background: var(--bg-3); color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+  .tab.active::before {
+    content: ''; width: 3px; height: 18px; border-radius: 3px;
+    background: var(--accent-grad); margin-right: -4px;
+  }
+  .tab svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar-foot { margin-top: auto; padding: 10px; font-size: 11px; color: var(--muted); }
+
+  /* ========== MAIN ========== */
+  .main { padding: 32px 40px; max-width: 1100px; width: 100%; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .page-head .subtitle { color: var(--muted); font-size: 13px; }
+
+  .panel { display: none; animation: fadeUp .3s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(20px);
+  }
+  .card + .card { margin-top: 16px; }
+  .card h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* inputs */
+  input, select, textarea {
+    font-size: 14px; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg-2); color: var(--text);
+    width: 100%; font-family: inherit; transition: all 0.15s;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent); background: var(--bg-3);
+    box-shadow: 0 0 0 3px rgba(124,92,255,0.2);
+  }
+  select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0b4' stroke-width='2.5'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; color-scheme: dark; }
+  select option, select optgroup { background-color: #0e0e1f; color: #f4f4f8; }
+  label { font-size: 12px; color: var(--muted); display: block; margin: 10px 0 6px; font-weight: 500; letter-spacing: 0.02em; }
+  button {
+    font-size: 14px; padding: 11px 16px; border-radius: 10px; border: none;
+    background: var(--accent-grad); color: white; cursor: pointer; font-weight: 600;
+    font-family: inherit; transition: transform 0.08s, filter 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 14px rgba(124,92,255,0.3);
+  }
+  button:hover { filter: brightness(1.1); }
+  button:active { transform: translateY(1px); }
+  button.ghost { background: var(--bg-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+  button.ghost:hover { background: var(--bg-3); }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 140px; }
+
+  /* calc display + keys */
+  .display {
+    background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.15));
+    border: 1px solid var(--border);
+    padding: 24px 20px; border-radius: 14px;
+    min-height: 90px; text-align: right;
+    font-size: 34px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 16px; word-wrap: break-word; overflow-wrap: anywhere;
+    letter-spacing: -0.01em;
+  }
+  .keys { display: grid; gap: 8px; }
+  .keys button {
+    padding: 16px; font-size: 17px; background: var(--bg-2);
+    color: var(--text); box-shadow: inset 0 0 0 1px var(--border);
+    font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    transition: all 0.1s;
+  }
+  .keys button:hover { background: var(--bg-3); transform: translateY(-1px); }
+  .keys button.op { background: var(--accent-grad); color: white; box-shadow: 0 4px 14px rgba(124,92,255,0.25); }
+  .keys button.fn { background: rgba(34,211,238,0.1); color: var(--accent-2); font-size: 13px; box-shadow: inset 0 0 0 1px rgba(34,211,238,0.25); }
+  .keys button.fn:hover { background: rgba(34,211,238,0.18); }
+  .normal .keys { grid-template-columns: repeat(4, 1fr); }
+  .sci .keys { grid-template-columns: repeat(6, 1fr); }
+
+  .mode-switch {
+    display: inline-flex; padding: 4px; background: var(--bg-2); border-radius: 10px;
+    border: 1px solid var(--border); margin-bottom: 16px; gap: 2px;
+  }
+  .mode-switch button {
+    background: transparent; color: var(--muted); padding: 8px 16px; font-size: 13px;
+    box-shadow: none; border-radius: 7px; font-weight: 500;
+  }
+  .mode-switch button.active { background: var(--bg-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+  .result {
+    background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+    padding: 14px 16px; border-radius: 10px; margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    white-space: pre-wrap; min-height: 44px; color: var(--accent-2);
+    line-height: 1.6;
+  }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .note code { background: var(--bg-2); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+  /* unit converter side-by-side */
+  .converter {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: end;
+  }
+  .converter .arrow {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--bg-3); color: var(--accent); border: 1px solid var(--border);
+    margin-bottom: 4px; cursor: pointer; transition: transform 0.3s ease, background 0.15s;
+    padding: 0;
+  }
+  .converter .arrow:hover { background: var(--bg-2); transform: rotate(180deg); filter: brightness(1.2); }
+  .converter .arrow:active { transform: rotate(180deg) scale(0.92); }
+  @media (max-width: 640px) { .converter { grid-template-columns: 1fr; } .converter .arrow { transform: rotate(90deg); margin: 0 auto; } }
+
+  /* mobile: bottom nav */
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; bottom: 0; left: 0; right: 0; top: auto; height: auto;
+      flex-direction: row; padding: 8px; gap: 4px;
+      border-right: none; border-top: 1px solid var(--border);
+      background: rgba(7,7,15,0.9); backdrop-filter: blur(20px);
+      z-index: 10; justify-content: space-around;
+    }
+    .brand, .nav-label, .sidebar-foot { display: none; }
+    .tab { flex-direction: column; gap: 4px; padding: 8px; font-size: 10px; text-align: center; }
+    .tab.active::before { display: none; }
+    .tab svg { width: 20px; height: 20px; }
+    .main { padding: 20px 16px 100px; }
+    .page-head h1 { font-size: 22px; }
+    .display { font-size: 28px; padding: 18px; }
+    .keys button { padding: 13px; font-size: 15px; }
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">∑</div>
+      <div>
+        <div class="name">Polymath</div>
+        <div class="sub">All-in-one calc</div>
+      </div>
+    </div>
+    <div class="nav-label">Tools</div>
+    <button class="tab active" data-mode="calc" data-title="Calculator" data-desc="Normal & scientific mode with full keyboard support">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
+      <span>Calculator</span>
+    </button>
+    <button class="tab" data-mode="algebra" data-title="Algebra" data-desc="Solve equations, simplify, differentiate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z"/><path d="M14 4l6 6M20 4l-6 6"/><circle cx="7" cy="17" r="3"/><path d="M14 14h6v6h-6z"/></svg>
+      <span>Algebra</span>
+    </button>
+    <button class="tab" data-mode="units" data-title="Unit Converter" data-desc="14 categories: length, mass, power, dB, data, more">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+      <span>Units</span>
+    </button>
+    <button class="tab" data-mode="currency" data-title="Currency" data-desc="45+ currencies with live rate updates">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      <span>Currency</span>
+    </button>
+    <button class="tab" data-mode="words" data-title="Number to Words" data-desc="12 languages with pronunciation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/><circle cx="12" cy="12" r="10"/></svg>
+      <span>Words</span>
+    </button>
+    <button class="tab" data-mode="fractions" data-title="Fractions" data-desc="Add, subtract, multiply, divide fractions & mixed numbers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      <span>Fractions</span>
+    </button>
+    <button class="tab" data-mode="rounding" data-title="Rounding" data-desc="Round to nearest 10, 100, 1000, decimals & more">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+      <span>Rounding</span>
+    </button>
+    <button class="tab" data-mode="calculus" data-title="Calculus" data-desc="Derivatives, integrals, limits — explained simply">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3c-2 0-3 2-3 5v2a3 3 0 01-3 3 3 3 0 013 3v2c0 3 1 5 3 5"/><path d="M16 3c2 0 3 2 3 5v2a3 3 0 003 3 3 3 0 00-3 3v2c0 3-1 5-3 5"/></svg>
+      <span>Calculus</span>
+    </button>
+    <div class="sidebar-foot">v1.1 · offline-ready</div>
+  </aside>
+
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1 id="pageTitle">Calculator</h1>
+        <div class="subtitle" id="pageDesc">Normal & scientific mode with full keyboard support</div>
+      </div>
+    </div>
+
+    <!-- CALC -->
+    <div class="panel active" id="calc">
+      <div class="card">
+        <div class="mode-switch" role="tablist">
+          <button id="modeNormal" class="active">Normal</button>
+          <button id="modeSci">Scientific</button>
+        </div>
+        <div class="display" id="display">0</div>
+        <div class="keys" id="keys"></div>
+      </div>
+    </div>
+
+    <!-- ALGEBRA -->
+    <div class="panel" id="algebra">
+      <div class="card">
+        <h3>Expression / Equation</h3>
+        <input id="algInput" placeholder="x^2 - 4 = 0">
+        <div class="note">Examples: <code>2x + 3 = 11</code> · <code>x^3 - 6x^2 + 11x - 6 = 0</code> · <code>(x+1)(x-2)</code></div>
+        <div class="row" style="margin-top:16px">
+          <button onclick="algSolve()">Solve for x</button>
+          <button class="ghost" onclick="algEval()">Simplify</button>
+          <button class="ghost" onclick="algDeriv()">d/dx</button>
+        </div>
+        <div class="result" id="algResult">Awaiting input…</div>
+      </div>
+    </div>
+
+    <!-- UNITS -->
+    <div class="panel" id="units">
+      <div class="card">
+        <h3>Category</h3>
+        <select id="unitCat"></select>
+      </div>
+      <div class="card">
+        <div class="converter">
+          <div>
+            <label>From</label>
+            <input id="unitVal" type="number" value="1" step="any">
+            <div style="height:8px"></div>
+            <select id="unitFrom"></select>
+          </div>
+          <button class="arrow" id="unitSwap" title="Swap units" aria-label="Swap units">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          </button>
+          <div>
+            <label>To</label>
+            <div class="result" id="unitOut" style="margin-top:0">—</div>
+            <div style="height:8px"></div>
+            <select id="unitTo"></select>
+          </div>
+        </div>
+        <div class="note">Supports length, mass, time, temperature, power, energy, pressure, volume, area, speed, data, sound (dB), angle, frequency.</div>
+      </div>
+    </div>
+
+    <!-- CURRENCY -->
+    <div class="panel" id="currency">
+      <div class="card">
+        <div>
+          <label>Amount</label>
+          <input id="curVal" type="number" value="1" step="any">
+        </div>
+        <div class="converter" style="margin-top:10px">
+          <div>
+            <label>From</label>
+            <select id="curFrom"></select>
+          </div>
+          <button class="arrow" id="curSwap" title="Swap currencies" aria-label="Swap currencies">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          </button>
+          <div>
+            <label>To</label>
+            <select id="curTo"></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button onclick="convertCurrency()">Convert</button>
+          <button class="ghost" onclick="fetchLiveRates()">Update live rates</button>
+        </div>
+        <div class="result" id="curOut">—</div>
+        <div class="note" id="curNote">Using static reference rates. Click "Update live rates" for current values (needs internet).</div>
+      </div>
+    </div>
+
+    <!-- WORDS -->
+    <div class="panel" id="words">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label>Number</label>
+            <input id="wNum" type="number" value="123" step="1">
+          </div>
+          <div>
+            <label>Language</label>
+            <select id="wLang"></select>
+          </div>
+        </div>
+        <div style="margin-top:16px"><button onclick="numToWords()">Translate</button></div>
+        <div class="result" id="wOut" style="font-size:16px">—</div>
+        <div class="note">Pronunciation (romanization) shown for non-Latin scripts. Integer range: -999,999,999 to 999,999,999.</div>
+      </div>
+    </div>
+
+    <!-- FRACTIONS -->
+    <div class="panel" id="fractions">
+      <div class="card">
+        <h3>Fraction Expression</h3>
+        <input id="fracInput" placeholder="1 1/2 + 2/3">
+        <div class="note">Mixed fractions: <code>1 1/2</code> · Improper: <code>3/2</code> · Ops: <code>+ - * /</code> · Parens OK: <code>(1/2 + 1/3) * 4/5</code></div>
+        <div class="row" style="margin-top:16px">
+          <button onclick="fracCalc()">Calculate</button>
+          <button class="ghost" onclick="document.getElementById('fracInput').value=''; document.getElementById('fracOut').textContent='—'">Clear</button>
+        </div>
+        <div class="result" id="fracOut">—</div>
+      </div>
+    </div>
+
+    <!-- ROUNDING -->
+    <div class="panel" id="rounding">
+      <div class="card">
+        <h3>Number to Round</h3>
+        <input id="roundInput" type="number" value="1234.5678" step="any">
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Round to</label>
+            <select id="roundPlace">
+              <option value="1000000">Nearest Million</option>
+              <option value="100000">Nearest Hundred Thousand</option>
+              <option value="10000">Nearest Ten Thousand</option>
+              <option value="1000">Nearest Thousand</option>
+              <option value="100">Nearest Hundred</option>
+              <option value="10" selected>Nearest Ten</option>
+              <option value="1">Nearest Whole (Ones)</option>
+              <option value="0.1">Nearest Tenth (0.1)</option>
+              <option value="0.01">Nearest Hundredth (0.01)</option>
+              <option value="0.001">Nearest Thousandth (0.001)</option>
+              <option value="0.0001">Nearest Ten-Thousandth</option>
+              <option value="0.000001">Nearest Millionth</option>
+            </select>
+          </div>
+          <div>
+            <label>Method</label>
+            <select id="roundMethod">
+              <option value="halfUp" selected>Half Up (standard)</option>
+              <option value="halfEven">Half to Even (banker's)</option>
+              <option value="halfDown">Half Down</option>
+              <option value="floor">Floor (down)</option>
+              <option value="ceil">Ceil (up)</option>
+              <option value="trunc">Truncate</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px"><button onclick="roundCalc()">Round</button></div>
+        <div class="result" id="roundOut">—</div>
+        <div class="note">Half Up rounds .5 away from zero. Half to Even (banker's rounding) reduces bias over many values.</div>
+      </div>
+    </div>
+
+    <!-- CALCULUS -->
+    <div class="panel" id="calculus">
+      <div class="card">
+        <h3>Function f(x)</h3>
+        <input id="calcFn" placeholder="x^2 + 3x - 5" value="x^2 + 3x - 5">
+        <div class="note">Examples: <code>sin(x)</code> · <code>e^x</code> · <code>ln(x)</code> · <code>x^3 - 2x + 1</code> · <code>1/x</code></div>
+      </div>
+
+      <div class="card">
+        <h3>Derivative (Slope Function)</h3>
+        <div class="note" style="margin-top:-4px">Tells you how fast f(x) changes. Slope of tangent line.</div>
+        <div class="row" style="margin-top:10px">
+          <button onclick="calcDerivative()">Find d/dx</button>
+          <div>
+            <label>Evaluate at x =</label>
+            <input id="calcAt" type="number" value="2" step="any">
+          </div>
+          <button class="ghost" onclick="calcTangent()">Tangent line at x</button>
+        </div>
+        <div class="result" id="derivOut">—</div>
+      </div>
+
+      <div class="card">
+        <h3>Definite Integral (Area Under Curve)</h3>
+        <div class="note" style="margin-top:-4px">Area between the curve and the x-axis from a to b. Computed numerically (Simpson's rule).</div>
+        <div class="row" style="margin-top:10px">
+          <div><label>From a =</label><input id="intA" type="number" value="0" step="any"></div>
+          <div><label>To b =</label><input id="intB" type="number" value="5" step="any"></div>
+          <button onclick="calcIntegral()" style="flex:0 0 auto; align-self: end">∫ Compute</button>
+        </div>
+        <div class="result" id="intOut">—</div>
+      </div>
+
+      <div class="card">
+        <h3>Limit</h3>
+        <div class="note" style="margin-top:-4px">Value f(x) approaches as x gets close to a point.</div>
+        <div class="row" style="margin-top:10px">
+          <div><label>As x → </label><input id="limAt" type="text" value="0"></div>
+          <button onclick="calcLimit()" style="flex:0 0 auto; align-self:end">Find limit</button>
+        </div>
+        <div class="note">Use <code>Infinity</code> or <code>-Infinity</code> for limits at infinity.</div>
+        <div class="result" id="limOut">—</div>
+      </div>
+
+      <div class="card">
+        <h3>Algebra Helpers (Pre-Calculus)</h3>
+        <div class="row" style="margin-top:6px">
+          <button class="ghost" onclick="calcSimplify()">Simplify</button>
+          <button class="ghost" onclick="calcExpand()">Expand</button>
+          <button class="ghost" onclick="calcEvalAt()">Evaluate f(x) at x</button>
+        </div>
+        <div class="result" id="preOut">—</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // update page head on tab click
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      const title = t.dataset.title, desc = t.dataset.desc;
+      if (title) document.getElementById('pageTitle').textContent = title;
+      if (desc) document.getElementById('pageDesc').textContent = desc;
+    });
+  });
+  // mode switch buttons
+  window.addEventListener('DOMContentLoaded', () => {
+    const mn = document.getElementById('modeNormal');
+    const ms = document.getElementById('modeSci');
+    if (mn && ms) {
+      mn.onclick = () => { if (sciMode) { sciMode = false; mn.classList.add('active'); ms.classList.remove('active'); renderKeys(); } };
+      ms.onclick = () => { if (!sciMode) { sciMode = true; ms.classList.add('active'); mn.classList.remove('active'); renderKeys(); } };
+    }
+    // unit swap
+    const us = document.getElementById('unitSwap');
+    if (us) us.onclick = () => {
+      const f = document.getElementById('unitFrom'), t = document.getElementById('unitTo');
+      [f.value, t.value] = [t.value, f.value];
+      convertUnit();
+    };
+    // currency swap
+    const cs = document.getElementById('curSwap');
+    if (cs) cs.onclick = () => {
+      const f = document.getElementById('curFrom'), t = document.getElementById('curTo');
+      [f.value, t.value] = [t.value, f.value];
+      convertCurrency();
+    };
+  });
+</script>
+
+<script>
+/* ==================== TAB SWITCHING ==================== */
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.mode).classList.add('active');
+  };
+});
+
+/* ==================== CALCULATOR (Normal / Scientific) ==================== */
+const display = document.getElementById('display');
+const keysDiv = document.getElementById('keys');
+let sciMode = false;
+let expr = '';
+
+const normalKeys = [
+  'C','(',')','/',
+  '7','8','9','*',
+  '4','5','6','-',
+  '1','2','3','+',
+  '0','.','⌫','='
+];
+const sciKeys = [
+  'C','(',')','/','%','^',
+  '7','8','9','*','sin','cos',
+  '4','5','6','-','tan','log',
+  '1','2','3','+','ln','sqrt',
+  '0','.','⌫','=','pi','e',
+  'x^2','x^3','1/x','abs','!','exp'
+];
+
+function renderKeys() {
+  const keys = sciMode ? sciKeys : normalKeys;
+  document.getElementById('calc').className = 'panel active ' + (sciMode ? 'sci' : 'normal');
+  keysDiv.innerHTML = '';
+  keys.forEach(k => {
+    const b = document.createElement('button');
+    b.textContent = k;
+    if (['+','-','*','/','='].includes(k)) b.className = 'op';
+    else if (isNaN(k) && !['(',')','.','⌫','C'].includes(k)) b.className = 'fn';
+    b.onclick = () => pressKey(k);
+    keysDiv.appendChild(b);
+  });
+}
+
+function pressKey(k) {
+  try {
+    if (k === 'C') { expr = ''; display.textContent = '0'; return; }
+    if (k === '⌫') { expr = expr.slice(0, -1); display.textContent = expr || '0'; return; }
+    if (k === '=') {
+      if (!expr) return;
+      const r = math.evaluate(expr);
+      display.textContent = formatNum(r);
+      expr = String(r);
+      return;
+    }
+    const map = {
+      'sin':'sin(','cos':'cos(','tan':'tan(','log':'log10(','ln':'log(','sqrt':'sqrt(',
+      'pi':'pi','e':'e','x^2':'^2','x^3':'^3','1/x':'^-1','abs':'abs(','!':'!','exp':'exp('
+    };
+    expr += map[k] ?? k;
+    display.textContent = expr;
+  } catch (e) { display.textContent = 'Error'; expr = ''; }
+}
+
+function formatNum(n) {
+  if (typeof n === 'number' && !isFinite(n)) return 'Error';
+  if (typeof n === 'number') return +n.toPrecision(12);
+  return String(n);
+}
+
+const _toggleSci = document.getElementById('toggleSci');
+if (_toggleSci) _toggleSci.onclick = () => {
+  sciMode = !sciMode;
+  _toggleSci.textContent = sciMode ? 'Switch to Normal' : 'Switch to Scientific';
+  renderKeys();
+};
+renderKeys();
+
+// keyboard support
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('calc').classList.contains('active')) return;
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key;
+  if (/[0-9+\-*/.()^%]/.test(k)) { expr += k; display.textContent = expr; }
+  else if (k === 'Enter' || k === '=') pressKey('=');
+  else if (k === 'Backspace') pressKey('⌫');
+  else if (k === 'Escape') pressKey('C');
+});
+
+/* ==================== ALGEBRA ==================== */
+function algSolve() {
+  const s = document.getElementById('algInput').value.trim();
+  const out = document.getElementById('algResult');
+  try {
+    if (!s.includes('=')) { out.textContent = 'Need an equation with "="'; return; }
+    const [lhs, rhs] = s.split('=');
+    // bring to lhs - rhs = 0
+    const f = math.simplify(`(${lhs}) - (${rhs})`).toString();
+    // try symbolic solve via numeric root-finding + factoring for polynomials up to deg 4
+    const roots = solvePoly(f);
+    out.textContent = `f(x) = ${f} = 0\nSolutions: ${roots.length ? roots.map(r=>formatNum(r)).join(', ') : 'no closed-form found'}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function solvePoly(exprStr) {
+  // extract polynomial coefficients in x up to degree 4 via evaluation
+  try {
+    const n = 5; // degrees 0..4
+    const xs = [-2,-1,0,1,2]; // 5 points
+    const ys = xs.map(x => math.evaluate(exprStr, {x}));
+    // Solve Vandermonde system for coefficients a0..a4
+    const V = xs.map(x => [1,x,x*x,x*x*x,x*x*x*x]);
+    const coefs = math.lusolve(V, ys).map(r=>r[0]);
+    // trim near-zero high-degree coefs
+    while (coefs.length > 1 && Math.abs(coefs[coefs.length-1]) < 1e-9) coefs.pop();
+    return numericRoots(coefs);
+  } catch { return []; }
+}
+
+function numericRoots(c) {
+  // Durand-Kerner for polynomial with coefficients c (ascending powers)
+  const n = c.length - 1;
+  if (n < 1) return [];
+  if (n === 1) return [-c[0]/c[1]];
+  if (n === 2) {
+    const [a0,a1,a2] = c;
+    const d = a1*a1 - 4*a2*a0;
+    if (d < 0) return [];
+    return [(-a1+Math.sqrt(d))/(2*a2), (-a1-Math.sqrt(d))/(2*a2)];
+  }
+  // general: Durand-Kerner complex
+  const roots = [];
+  for (let k=0;k<n;k++) roots.push({re:Math.cos(2*Math.PI*k/n)*0.9, im:Math.sin(2*Math.PI*k/n)*0.9});
+  const evalP = z => {
+    let r={re:0,im:0};
+    for (let i=c.length-1;i>=0;i--) {
+      const nr = r.re*z.re - r.im*z.im + c[i];
+      const ni = r.re*z.im + r.im*z.re;
+      r = {re:nr, im:ni};
+    }
+    return r;
+  };
+  for (let iter=0; iter<200; iter++) {
+    for (let i=0;i<n;i++) {
+      let denom = {re:1, im:0};
+      for (let j=0;j<n;j++) if (i!==j) {
+        const dr=roots[i].re-roots[j].re, di=roots[i].im-roots[j].im;
+        const nr=denom.re*dr-denom.im*di, ni=denom.re*di+denom.im*dr;
+        denom={re:nr,im:ni};
+      }
+      const p = evalP(roots[i]);
+      const den2 = denom.re*denom.re+denom.im*denom.im;
+      if (den2 === 0) continue;
+      const qr = (p.re*denom.re+p.im*denom.im)/den2;
+      const qi = (p.im*denom.re-p.re*denom.im)/den2;
+      roots[i] = {re:roots[i].re-qr, im:roots[i].im-qi};
+    }
+  }
+  return roots.filter(r=>Math.abs(r.im)<1e-6).map(r=>+r.re.toPrecision(10));
+}
+
+function algEval() {
+  const s = document.getElementById('algInput').value.trim();
+  try {
+    const r = math.simplify(s).toString();
+    document.getElementById('algResult').textContent = 'Simplified: ' + r;
+  } catch (e) { document.getElementById('algResult').textContent = 'Error: ' + e.message; }
+}
+function algDeriv() {
+  const s = document.getElementById('algInput').value.trim();
+  try {
+    const r = math.derivative(s, 'x').toString();
+    document.getElementById('algResult').textContent = 'd/dx: ' + r;
+  } catch (e) { document.getElementById('algResult').textContent = 'Error: ' + e.message; }
+}
+
+/* ==================== UNITS ==================== */
+const unitCategories = {
+  Length: ['m','km','cm','mm','mile','ft','inch','yard','nmi'],
+  Mass: ['kg','g','mg','lb','oz','ton','stone'],
+  Time: ['s','min','hour','day','week','year'],
+  Temperature: ['degC','degF','K'],
+  Power: ['W','kW','MW','hp'],
+  Energy: ['J','kJ','cal','kcal','Wh','kWh','BTU','eV'],
+  Pressure: ['Pa','kPa','bar','atm','psi','torr','mmHg'],
+  Volume: ['L','mL','m^3','gal','qt','pt','cup','floz'],
+  Area: ['m^2','km^2','cm^2','ft^2','acre','hectare'],
+  Speed: ['m/s','km/h','mph','knot','ft/s'],
+  Data: ['b','B','KB','MB','GB','TB','KiB','MiB','GiB'],
+  Angle: ['rad','deg','grad'],
+  Frequency: ['Hz','kHz','MHz','GHz']
+};
+const unitCat = document.getElementById('unitCat');
+const unitFrom = document.getElementById('unitFrom');
+const unitTo = document.getElementById('unitTo');
+Object.keys(unitCategories).forEach(c => unitCat.add(new Option(c,c)));
+unitCat.add(new Option('Sound (dB)','Sound'));
+
+function populateUnits() {
+  const cat = unitCat.value;
+  unitFrom.innerHTML=''; unitTo.innerHTML='';
+  if (cat === 'Sound') {
+    ['dB','ratio (power)','ratio (amplitude)'].forEach(u=>{unitFrom.add(new Option(u,u));unitTo.add(new Option(u,u));});
+    unitTo.selectedIndex = 1;
+  } else {
+    unitCategories[cat].forEach(u=>{unitFrom.add(new Option(u,u));unitTo.add(new Option(u,u));});
+    unitTo.selectedIndex = Math.min(1, unitCategories[cat].length-1);
+  }
+  convertUnit();
+}
+unitCat.onchange = populateUnits;
+[unitFrom, unitTo, document.getElementById('unitVal')].forEach(el => el.oninput = el.onchange = convertUnit);
+
+function convertUnit() {
+  const out = document.getElementById('unitOut');
+  const v = parseFloat(document.getElementById('unitVal').value);
+  if (isNaN(v)) { out.textContent = '—'; return; }
+  try {
+    if (unitCat.value === 'Sound') {
+      const from = unitFrom.value, to = unitTo.value;
+      let r;
+      if (from === to) r = v;
+      else if (from === 'dB' && to.startsWith('ratio (power')) r = Math.pow(10, v/10);
+      else if (from === 'dB' && to.startsWith('ratio (amp')) r = Math.pow(10, v/20);
+      else if (to === 'dB' && from.startsWith('ratio (power')) r = 10*Math.log10(v);
+      else if (to === 'dB' && from.startsWith('ratio (amp')) r = 20*Math.log10(v);
+      else r = v; // ratio <-> ratio: just pass
+      out.textContent = formatNum(r);
+      return;
+    }
+    const q = math.unit(v, unitFrom.value).to(unitTo.value);
+    out.textContent = formatNum(q.toNumber());
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+populateUnits();
+
+/* ==================== CURRENCY ==================== */
+// Static reference rates (per 1 USD) — update with live button
+let rates = {
+  USD:1, EUR:0.92, GBP:0.79, JPY:155, CNY:7.24, INR:83.4, CAD:1.36, AUD:1.52, CHF:0.90,
+  HKD:7.82, SGD:1.35, SEK:10.6, KRW:1370, NOK:10.8, NZD:1.66, MXN:17.1, RUB:92, ZAR:18.7,
+  TRY:32.3, BRL:5.05, TWD:32.4, DKK:6.87, PLN:3.95, THB:36.6, IDR:15900, HUF:358, CZK:23.3,
+  ILS:3.72, CLP:950, PHP:56.8, AED:3.67, SAR:3.75, MYR:4.71, RON:4.58, COP:3900, PKR:278,
+  BDT:110, VND:25000, EGP:48, NGN:1600, ARS:880, UAH:39.6, KZT:447, QAR:3.64, KWD:0.31, OMR:0.385
+};
+let ratesSource = 'static';
+const curFrom = document.getElementById('curFrom');
+const curTo = document.getElementById('curTo');
+function populateCurrencies() {
+  curFrom.innerHTML=''; curTo.innerHTML='';
+  Object.keys(rates).sort().forEach(c => { curFrom.add(new Option(c,c)); curTo.add(new Option(c,c)); });
+  curFrom.value = 'USD'; curTo.value = 'EUR';
+}
+populateCurrencies();
+function convertCurrency() {
+  const v = parseFloat(document.getElementById('curVal').value);
+  const out = document.getElementById('curOut');
+  if (isNaN(v)) { out.textContent = '—'; return; }
+  const usd = v / rates[curFrom.value];
+  const r = usd * rates[curTo.value];
+  out.textContent = `${v} ${curFrom.value} = ${r.toFixed(4)} ${curTo.value}\n(source: ${ratesSource})`;
+}
+async function fetchLiveRates() {
+  const note = document.getElementById('curNote');
+  note.textContent = 'Fetching...';
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    const d = await r.json();
+    if (d && d.rates) {
+      rates = d.rates;
+      ratesSource = 'live ' + (d.time_last_update_utc || '');
+      populateCurrencies();
+      note.textContent = 'Live rates loaded. ' + ratesSource;
+    } else throw new Error('bad response');
+  } catch (e) {
+    note.textContent = 'Live fetch failed (offline?). Using static rates.';
+  }
+}
+
+/* ==================== NUMBER → WORDS ==================== */
+const languages = {
+  English:{native:'English'}, Spanish:{native:'Español'}, French:{native:'Français'},
+  German:{native:'Deutsch'}, Italian:{native:'Italiano'}, Portuguese:{native:'Português'},
+  Russian:{native:'Русский'}, Chinese:{native:'中文'}, Japanese:{native:'日本語'},
+  Hindi:{native:'हिन्दी'}, Arabic:{native:'العربية'}, Korean:{native:'한국어'}
+};
+const wLang = document.getElementById('wLang');
+Object.keys(languages).forEach(l => wLang.add(new Option(`${l} (${languages[l].native})`, l)));
+
+function numToWords() {
+  const n = parseInt(document.getElementById('wNum').value, 10);
+  const out = document.getElementById('wOut');
+  if (isNaN(n)) { out.textContent = 'Invalid number'; return; }
+  if (Math.abs(n) > 999999999) { out.textContent = 'Range: -999,999,999 to 999,999,999'; return; }
+  const lang = wLang.value;
+  try {
+    const { native, pron } = speakNumber(n, lang);
+    out.textContent = `${lang}: ${native}` + (pron ? `\nPronunciation: ${pron}` : '');
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function speakNumber(n, lang) {
+  if (n < 0) {
+    const r = speakNumber(-n, lang);
+    const neg = {English:'negative', Spanish:'menos', French:'moins', German:'minus', Italian:'meno',
+      Portuguese:'menos', Russian:'минус', Chinese:'负', Japanese:'マイナス', Hindi:'ऋण',
+      Arabic:'سالب', Korean:'마이너스'};
+    const pneg = {Russian:'minus', Chinese:'fù', Japanese:'mainasu', Hindi:'rin', Arabic:'saalib', Korean:'mainoseu'};
+    return { native: neg[lang]+' '+r.native, pron: r.pron ? (pneg[lang]||neg[lang])+' '+r.pron : '' };
+  }
+  switch(lang) {
+    case 'English': return { native: enWords(n), pron: '' };
+    case 'Spanish': return { native: esWords(n), pron: '' };
+    case 'French': return { native: frWords(n), pron: '' };
+    case 'German': return { native: deWords(n), pron: '' };
+    case 'Italian': return { native: itWords(n), pron: '' };
+    case 'Portuguese': return { native: ptWords(n), pron: '' };
+    case 'Russian': { const [na,pr] = ruWords(n); return {native:na, pron:pr}; }
+    case 'Chinese': { const [na,pr] = zhWords(n); return {native:na, pron:pr}; }
+    case 'Japanese': { const [na,pr] = jaWords(n); return {native:na, pron:pr}; }
+    case 'Hindi': { const [na,pr] = hiWords(n); return {native:na, pron:pr}; }
+    case 'Arabic': { const [na,pr] = arWords(n); return {native:na, pron:pr}; }
+    case 'Korean': { const [na,pr] = koWords(n); return {native:na, pron:pr}; }
+  }
+}
+
+// English
+function enWords(n) {
+  if (n===0) return 'zero';
+  const u=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+  const t=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+  function u1k(n){let s='';if(n>=100){s+=u[Math.floor(n/100)]+' hundred';n%=100;if(n)s+=' ';}if(n>=20){s+=t[Math.floor(n/10)];if(n%10)s+='-'+u[n%10];}else if(n>0)s+=u[n];return s;}
+  let s='';
+  const m=Math.floor(n/1e6);if(m){s+=u1k(m)+' million';n%=1e6;if(n)s+=' ';}
+  const k=Math.floor(n/1e3);if(k){s+=u1k(k)+' thousand';n%=1e3;if(n)s+=' ';}
+  if(n)s+=u1k(n);
+  return s.trim();
+}
+// Spanish (simplified)
+function esWords(n){if(n===0)return'cero';const u=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte'];const t=['','','veinti','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];const c=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+function u1k(n){if(n===100)return'cien';let s='';if(n>=100){s+=c[Math.floor(n/100)];n%=100;if(n)s+=' ';}if(n<=20)s+=u[n];else if(n<30){s+=t[2];if(n%10)s+=u[n%10];}else{s+=t[Math.floor(n/10)];if(n%10)s+=' y '+u[n%10];}return s;}
+let s='';const m=Math.floor(n/1e6);if(m){s+=(m===1?'un':u1k(m))+' millón'+(m>1?'es':'');n%=1e6;if(n)s+=' ';}
+const k=Math.floor(n/1e3);if(k){s+=(k===1?'mil':u1k(k)+' mil');n%=1e3;if(n)s+=' ';}
+if(n)s+=u1k(n);return s.trim();}
+// French (simplified)
+function frWords(n){if(n===0)return'zéro';const u=['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+function u100(n){if(n<20)return u[n];if(n<70){const d=Math.floor(n/10),r=n%10;const t=['','','vingt','trente','quarante','cinquante','soixante'];return t[d]+(r===0?'':(r===1?' et un':'-'+u[r]));}if(n<80){return'soixante'+(n===60?'':(n===71?' et onze':'-'+u[n-60]));}if(n<100){return'quatre-vingt'+(n===80?'s':'-'+u[n-80]);}return'';}
+function u1k(n){let s='';if(n>=100){const h=Math.floor(n/100);s+=(h===1?'':u[h]+' ')+'cent'+(h>1&&n%100===0?'s':'');n%=100;if(n)s+=' ';}if(n)s+=u100(n);return s;}
+let s='';const m=Math.floor(n/1e6);if(m){s+=(m===1?'un million':u1k(m)+' millions');n%=1e6;if(n)s+=' ';}
+const k=Math.floor(n/1e3);if(k){s+=(k===1?'mille':u1k(k)+' mille');n%=1e3;if(n)s+=' ';}
+if(n)s+=u1k(n);return s.trim();}
+// German (simplified)
+function deWords(n){if(n===0)return'null';const u=['','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun','zehn','elf','zwölf','dreizehn','vierzehn','fünfzehn','sechzehn','siebzehn','achtzehn','neunzehn'];const t=['','','zwanzig','dreißig','vierzig','fünfzig','sechzig','siebzig','achtzig','neunzig'];
+function u1k(n){let s='';if(n>=100){s+=(u[Math.floor(n/100)]||'ein')+'hundert';n%=100;}if(n<20)s+=u[n];else{const d=Math.floor(n/10),r=n%10;s+=(r?(r===1?'ein':u[r])+'und':'')+t[d];}return s;}
+let s='';const m=Math.floor(n/1e6);if(m){s+=(m===1?'eine Million':u1k(m)+' Millionen');n%=1e6;if(n)s+=' ';}
+const k=Math.floor(n/1e3);if(k){s+=(k===1?'ein':u1k(k))+'tausend';n%=1e3;if(n)s+=' ';}
+if(n)s+=u1k(n);return s.trim();}
+// Italian (simplified)
+function itWords(n){if(n===0)return'zero';const u=['','uno','due','tre','quattro','cinque','sei','sette','otto','nove','dieci','undici','dodici','tredici','quattordici','quindici','sedici','diciassette','diciotto','diciannove'];const t=['','','venti','trenta','quaranta','cinquanta','sessanta','settanta','ottanta','novanta'];
+function u1k(n){let s='';if(n>=100){s+=(n>=200?u[Math.floor(n/100)]:'')+'cento';n%=100;}if(n<20)s+=u[n];else{const d=Math.floor(n/10),r=n%10;let base=t[d];if(r===1||r===8)base=base.slice(0,-1);s+=base+(r?u[r]:'');}return s;}
+let s='';const m=Math.floor(n/1e6);if(m){s+=(m===1?'un milione':u1k(m)+' milioni');n%=1e6;if(n)s+=' ';}
+const k=Math.floor(n/1e3);if(k){s+=(k===1?'mille':u1k(k)+'mila');n%=1e3;}
+if(n)s+=u1k(n);return s.trim();}
+// Portuguese (simplified)
+function ptWords(n){if(n===0)return'zero';const u=['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','catorze','quinze','dezesseis','dezessete','dezoito','dezenove'];const t=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];const c=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+function u1k(n){if(n===100)return'cem';let s='';if(n>=100){s+=c[Math.floor(n/100)];n%=100;if(n)s+=' e ';}if(n<20)s+=u[n];else{const d=Math.floor(n/10),r=n%10;s+=t[d]+(r?' e '+u[r]:'');}return s;}
+let s='';const m=Math.floor(n/1e6);if(m){s+=(m===1?'um milhão':u1k(m)+' milhões');n%=1e6;if(n)s+=' ';}
+const k=Math.floor(n/1e3);if(k){s+=(k===1?'mil':u1k(k)+' mil');n%=1e3;if(n)s+=' e ';}
+if(n)s+=u1k(n);return s.trim();}
+
+// Russian
+function ruWords(n){if(n===0)return['ноль','nol\''];
+const u1=['','один','два','три','четыре','пять','шесть','семь','восемь','девять','десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать','шестнадцать','семнадцать','восемнадцать','девятнадцать'];
+const u1p=['','odin','dva','tri','chetyre','pyat\'','shest\'','sem\'','vosem\'','devyat\'','desyat\'','odinnadtsat\'','dvenadtsat\'','trinadtsat\'','chetyrnadtsat\'','pyatnadtsat\'','shestnadtsat\'','semnadtsat\'','vosemnadtsat\'','devyatnadtsat\''];
+const t=['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто'];
+const tp=['','','dvadtsat\'','tridtsat\'','sorok','pyat\'desyat','shest\'desyat','sem\'desyat','vosem\'desyat','devyanosto'];
+const h=['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот'];
+const hp=['','sto','dvesti','trista','chetyresta','pyat\'sot','shest\'sot','sem\'sot','vosem\'sot','devyat\'sot'];
+function u1k(n){let na=[],pr=[];if(n>=100){na.push(h[Math.floor(n/100)]);pr.push(hp[Math.floor(n/100)]);n%=100;}if(n>=20){na.push(t[Math.floor(n/10)]);pr.push(tp[Math.floor(n/10)]);n%=10;}if(n>0){na.push(u1[n]);pr.push(u1p[n]);}return [na.join(' '),pr.join(' ')];}
+let na=[],pr=[];const m=Math.floor(n/1e6);if(m){const [a,b]=u1k(m);na.push(a+' миллион'+(m===1?'':(m<5?'а':'ов')));pr.push(b+' million'+(m===1?'':(m<5?'a':'ov')));n%=1e6;}
+const k=Math.floor(n/1e3);if(k){const [a,b]=u1k(k);const kk=k%100;const suf=(kk===1?'а':(kk>=2&&kk<=4?'и':''));na.push(a+' тысяч'+suf);pr.push(b+' tysyach'+(suf==='а'?'a':suf==='и'?'i':''));n%=1e3;}
+if(n){const [a,b]=u1k(n);na.push(a);pr.push(b);}
+return [na.join(' ').trim(), pr.join(' ').trim()];}
+
+// Chinese
+function zhWords(n){if(n===0)return['零','líng'];
+const d=['零','一','二','三','四','五','六','七','八','九'];
+const dp=['líng','yī','èr','sān','sì','wǔ','liù','qī','bā','jiǔ'];
+function u1w(n){if(n<10)return[d[n],dp[n]];if(n<20){const r=n-10;return[(r?d[r]:'')+'十'+(r?'':''),'shí'+(r?' '+dp[r]:'')]}return ['','']}
+function u1h(n){let na='',pr=[];if(n>=100){na+=d[Math.floor(n/100)]+'百';pr.push(dp[Math.floor(n/100)]+' bǎi');n%=100;if(n<10&&n>0){na+='零';pr.push('líng');}}if(n>=10){if(n>=20){na+=d[Math.floor(n/10)]+'十';pr.push(dp[Math.floor(n/10)]+' shí');}else{na+='十';pr.push('shí');}n%=10;}if(n>0){na+=d[n];pr.push(dp[n]);}return [na,pr.join(' ')];}
+let na='',pr=[];const yi=Math.floor(n/1e8);if(yi){const [a,b]=u1h(yi);na+=a+'亿';pr.push(b+' yì');n%=1e8;}
+const wan=Math.floor(n/1e4);if(wan){const [a,b]=u1h(wan);na+=a+'万';pr.push(b+' wàn');n%=1e4;}
+if(n){const [a,b]=u1h(n);na+=a;pr.push(b);}
+return [na, pr.join(' ').trim()];}
+
+// Japanese
+function jaWords(n){if(n===0)return['ゼロ','zero'];
+const d=['','一','二','三','四','五','六','七','八','九'];
+const dp=['','ichi','ni','san','yon','go','roku','nana','hachi','kyū'];
+function u1h(n){let na='',pr=[];if(n>=100){const h=Math.floor(n/100);const sp={3:'san',6:'rop',8:'hap'};na+=(h>1?d[h]:'')+'百';pr.push((sp[h]||dp[h])+(h===3||h===6||h===8?'yaku':'hyaku'));n%=100;}if(n>=10){const t=Math.floor(n/10);na+=(t>1?d[t]:'')+'十';pr.push((t>1?dp[t]+' ':'')+'jū');n%=10;}if(n){na+=d[n];pr.push(dp[n]);}return [na,pr.join(' ')];}
+let na='',pr=[];const oku=Math.floor(n/1e8);if(oku){const [a,b]=u1h(oku);na+=a+'億';pr.push(b+' oku');n%=1e8;}
+const man=Math.floor(n/1e4);if(man){const [a,b]=u1h(man);na+=a+'万';pr.push(b+' man');n%=1e4;}
+if(n){const [a,b]=u1h(n);na+=a;pr.push(b);}
+return [na, pr.join(' ').trim()];}
+
+// Hindi (simplified, <1 lakh precise; uses lakh/crore)
+function hiWords(n){if(n===0)return['शून्य','shunya'];
+const u=['','एक','दो','तीन','चार','पाँच','छह','सात','आठ','नौ','दस','ग्यारह','बारह','तेरह','चौदह','पंद्रह','सोलह','सत्रह','अठारह','उन्नीस','बीस'];
+const up=['','ek','do','teen','char','paanch','cheh','saat','aath','nau','das','gyarah','barah','terah','chaudah','pandrah','solah','satrah','atharah','unnees','bees'];
+const t=['','','बीस','तीस','चालीस','पचास','साठ','सत्तर','अस्सी','नब्बे'];
+const tp=['','','bees','tees','chalees','pachas','saath','sattar','assi','nabbe'];
+function u1h(n){let na=[],pr=[];if(n>=100){na.push(u[Math.floor(n/100)]+' सौ');pr.push(up[Math.floor(n/100)]+' sau');n%=100;}if(n<=20){if(n){na.push(u[n]);pr.push(up[n]);}}else{na.push(t[Math.floor(n/10)]);pr.push(tp[Math.floor(n/10)]);if(n%10){na.push(u[n%10]);pr.push(up[n%10]);}}return [na.join(' '),pr.join(' ')];}
+let na=[],pr=[];const cr=Math.floor(n/1e7);if(cr){const [a,b]=u1h(cr);na.push(a+' करोड़');pr.push(b+' crore');n%=1e7;}
+const la=Math.floor(n/1e5);if(la){const [a,b]=u1h(la);na.push(a+' लाख');pr.push(b+' lakh');n%=1e5;}
+const hz=Math.floor(n/1e3);if(hz){const [a,b]=u1h(hz);na.push(a+' हज़ार');pr.push(b+' hazaar');n%=1e3;}
+if(n){const [a,b]=u1h(n);na.push(a);pr.push(b);}
+return [na.join(' ').trim(),pr.join(' ').trim()];}
+
+// Arabic (simplified)
+function arWords(n){if(n===0)return['صفر','sifr'];
+const u=['','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'];
+const up=['','wahid','ithnan','thalatha','arba\'a','khamsa','sitta','sab\'a','thamaniya','tis\'a','ashara','ahad ashar','ithna ashar','thalathat ashar','arba\'at ashar','khamsat ashar','sittat ashar','sab\'at ashar','thamaniyat ashar','tis\'at ashar'];
+const t=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'];
+const tp=['','','ishrun','thalathun','arba\'un','khamsun','sittun','sab\'un','thamanun','tis\'un'];
+const h=['','مئة','مئتان','ثلاثمئة','أربعمئة','خمسمئة','ستمئة','سبعمئة','ثمانمئة','تسعمئة'];
+const hp=['','mi\'a','mi\'atan','thalath mi\'a','arba\' mi\'a','khams mi\'a','sitt mi\'a','sab\' mi\'a','thaman mi\'a','tis\' mi\'a'];
+function u1h(n){let na=[],pr=[];if(n>=100){na.push(h[Math.floor(n/100)]);pr.push(hp[Math.floor(n/100)]);n%=100;}if(n<20&&n>0){na.push(u[n]);pr.push(up[n]);}else if(n>=20){const r=n%10,d=Math.floor(n/10);if(r){na.push(u[r]+' و'+t[d]);pr.push(up[r]+' wa '+tp[d]);}else{na.push(t[d]);pr.push(tp[d]);}}return [na.join(' '),pr.join(' ')];}
+let na=[],pr=[];const m=Math.floor(n/1e6);if(m){const [a,b]=u1h(m);na.push(a+' مليون');pr.push(b+' milyun');n%=1e6;}
+const k=Math.floor(n/1e3);if(k){const [a,b]=u1h(k);na.push(a+' ألف');pr.push(b+' alf');n%=1e3;}
+if(n){const [a,b]=u1h(n);na.push(a);pr.push(b);}
+return [na.join(' و').trim(),pr.join(' wa ').trim()];}
+
+// Korean (Sino-Korean)
+function koWords(n){if(n===0)return['영','yeong'];
+const d=['','일','이','삼','사','오','육','칠','팔','구'];
+const dp=['','il','i','sam','sa','o','yuk','chil','pal','gu'];
+const units=['','십','백','천'];
+const unitsP=['','sip','baek','cheon'];
+function u1w(n){let na='',pr=[];const digs=String(n).padStart(4,'0');for(let i=0;i<4;i++){const v=+digs[i],u=3-i;if(v){na+=(v===1&&u>0?'':d[v])+units[u];pr.push((v===1&&u>0?'':dp[v])+unitsP[u]);}}return [na,pr.filter(Boolean).join(' ')];}
+let na='',pr=[];const eok=Math.floor(n/1e8);if(eok){const [a,b]=u1w(eok);na+=a+'억';pr.push(b+' eok');n%=1e8;}
+const man=Math.floor(n/1e4);if(man){const [a,b]=u1w(man);na+=a+'만';pr.push(b+' man');n%=1e4;}
+if(n){const [a,b]=u1w(n);na+=a;pr.push(b);}
+return [na,pr.join(' ').trim()];}
+
+/* ==================== FRACTIONS ==================== */
+const fracMath = math.create(math.all);
+fracMath.config({ number: 'Fraction' });
+
+function preprocessMixed(s) {
+  // Convert "W N/D" (mixed) to "(W + N/D)" with sign
+  // Also handle negative whole: "-1 1/2" -> -(1 + 1/2)
+  return s.replace(/(-?\d+)\s+(\d+)\s*\/\s*(\d+)/g, (m, w, n, d) => {
+    const W = parseInt(w, 10);
+    if (W < 0) return `(${W} - ${n}/${d})`;
+    return `(${W} + ${n}/${d})`;
+  });
+}
+
+function fracCalc() {
+  const raw = document.getElementById('fracInput').value.trim();
+  const out = document.getElementById('fracOut');
+  if (!raw) { out.textContent = 'Enter an expression'; return; }
+  try {
+    const expr = preprocessMixed(raw);
+    const r = fracMath.evaluate(expr);
+    let n, d;
+    if (r && typeof r === 'object' && 'n' in r && 'd' in r) {
+      n = r.s * r.n; d = r.d;
+    } else {
+      const f = fracMath.fraction(r);
+      n = f.s * f.n; d = f.d;
+    }
+    const decimal = (n / d);
+    let mixed;
+    if (d === 1) mixed = `${n}`;
+    else if (Math.abs(n) < d) mixed = `${n}/${d}`;
+    else {
+      const w = Math.trunc(n / d);
+      const rem = Math.abs(n - w * d);
+      mixed = `${w} ${rem}/${d}`;
+    }
+    out.textContent =
+      `Improper:  ${n}/${d}\n` +
+      `Mixed:     ${mixed}\n` +
+      `Decimal:   ${+decimal.toPrecision(12)}`;
+  } catch (e) {
+    out.textContent = 'Error: ' + e.message;
+  }
+}
+
+/* ==================== ROUNDING ==================== */
+function roundCalc() {
+  const n = parseFloat(document.getElementById('roundInput').value);
+  const p = parseFloat(document.getElementById('roundPlace').value);
+  const m = document.getElementById('roundMethod').value;
+  const out = document.getElementById('roundOut');
+  if (isNaN(n) || isNaN(p) || p <= 0) { out.textContent = 'Invalid input'; return; }
+  const q = n / p;
+  let r;
+  switch (m) {
+    case 'halfUp':   r = Math.sign(q) * Math.floor(Math.abs(q) + 0.5); break;
+    case 'halfDown': r = Math.sign(q) * Math.ceil(Math.abs(q) - 0.5); break;
+    case 'halfEven': {
+      const f = Math.floor(q), diff = q - f;
+      if (diff < 0.5) r = f;
+      else if (diff > 0.5) r = f + 1;
+      else r = (f % 2 === 0) ? f : f + 1;
+      break;
+    }
+    case 'floor': r = Math.floor(q); break;
+    case 'ceil':  r = Math.ceil(q); break;
+    case 'trunc': r = Math.trunc(q); break;
+  }
+  const result = r * p;
+  // fix float precision: count decimals in p
+  const decs = (p.toString().split('.')[1] || '').length;
+  const shown = decs > 0 ? result.toFixed(decs) : String(Math.round(result));
+  const placeLabel = document.getElementById('roundPlace').selectedOptions[0].textContent;
+  const methodLabel = document.getElementById('roundMethod').selectedOptions[0].textContent;
+  out.textContent =
+    `Input:   ${n}\n` +
+    `Rule:    ${placeLabel} (${methodLabel})\n` +
+    `Result:  ${shown}`;
+}
+
+/* ==================== CALCULUS ==================== */
+function _fn() { return document.getElementById('calcFn').value.trim(); }
+
+function calcDerivative() {
+  const out = document.getElementById('derivOut');
+  try {
+    const f = _fn();
+    const d = math.derivative(f, 'x').toString();
+    const at = parseFloat(document.getElementById('calcAt').value);
+    let atLine = '';
+    if (!isNaN(at)) {
+      const slope = math.evaluate(d, { x: at });
+      atLine = `\nSlope at x=${at}:  f'(${at}) = ${+slope.toPrecision(10)}`;
+    }
+    out.textContent =
+      `f(x)  = ${f}\n` +
+      `f'(x) = ${d}\n` +
+      `— means: the rate at which f(x) changes as x changes.` +
+      atLine;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function calcTangent() {
+  const out = document.getElementById('derivOut');
+  try {
+    const f = _fn();
+    const a = parseFloat(document.getElementById('calcAt').value);
+    if (isNaN(a)) { out.textContent = 'Enter a value for x'; return; }
+    const d = math.derivative(f, 'x').toString();
+    const fa = math.evaluate(f, { x: a });
+    const slope = math.evaluate(d, { x: a });
+    const b = fa - slope * a;
+    const bStr = b >= 0 ? `+ ${+b.toPrecision(8)}` : `- ${+Math.abs(b).toPrecision(8)}`;
+    out.textContent =
+      `Tangent line to f(x) = ${f} at x = ${a}\n` +
+      `Point:  (${a}, ${+fa.toPrecision(10)})\n` +
+      `Slope:  ${+slope.toPrecision(10)}\n` +
+      `Line:   y = ${+slope.toPrecision(8)}·x ${bStr}\n` +
+      `— this line just grazes the curve at x=${a}.`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function calcIntegral() {
+  const out = document.getElementById('intOut');
+  try {
+    const f = _fn();
+    const a = parseFloat(document.getElementById('intA').value);
+    const b = parseFloat(document.getElementById('intB').value);
+    if (isNaN(a) || isNaN(b)) { out.textContent = 'Enter numeric a, b'; return; }
+    if (a === b) { out.textContent = '∫ from a to a = 0'; return; }
+    const compiled = math.compile(f);
+    // Composite Simpson's 1/3 rule
+    const N = 1000; // even
+    const h = (b - a) / N;
+    let sum = compiled.evaluate({ x: a }) + compiled.evaluate({ x: b });
+    for (let i = 1; i < N; i++) {
+      const x = a + i * h;
+      sum += compiled.evaluate({ x }) * ((i % 2 === 0) ? 2 : 4);
+    }
+    const area = (h / 3) * sum;
+    out.textContent =
+      `∫ from ${a} to ${b} of (${f}) dx\n` +
+      `≈ ${+area.toPrecision(10)}\n` +
+      `— that's the signed area between the curve and the x-axis.\n` +
+      `  (Positive above axis, negative below.)`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function calcLimit() {
+  const out = document.getElementById('limOut');
+  try {
+    const f = _fn();
+    const raw = document.getElementById('limAt').value.trim();
+    const compiled = math.compile(f);
+    const near = (x) => compiled.evaluate({ x });
+    let leftStr, rightStr, result;
+    if (raw === 'Infinity' || raw === '+Infinity') {
+      const big = [1e3, 1e4, 1e6, 1e8, 1e10];
+      const vals = big.map(near);
+      result = vals[vals.length - 1];
+      out.textContent =
+        `lim (x → ∞) ${f}\n` +
+        `f(1e3)=${fmt(vals[0])}  f(1e6)=${fmt(vals[2])}  f(1e10)=${fmt(vals[4])}\n` +
+        `≈ ${fmt(result)}`;
+      return;
+    }
+    if (raw === '-Infinity') {
+      const vals = [-1e3,-1e6,-1e10].map(near);
+      result = vals[2];
+      out.textContent =
+        `lim (x → -∞) ${f}\n` +
+        `f(-1e3)=${fmt(vals[0])}  f(-1e6)=${fmt(vals[1])}  f(-1e10)=${fmt(vals[2])}\n` +
+        `≈ ${fmt(result)}`;
+      return;
+    }
+    const a = parseFloat(raw);
+    if (isNaN(a)) { out.textContent = 'Invalid target'; return; }
+    const eps = [1e-3, 1e-5, 1e-7];
+    const L = eps.map(e => near(a - e));
+    const R = eps.map(e => near(a + e));
+    leftStr = L.map(fmt).join(', ');
+    rightStr = R.map(fmt).join(', ');
+    const leftLim = L[L.length - 1], rightLim = R[R.length - 1];
+    let verdict;
+    if (!isFinite(leftLim) && !isFinite(rightLim)) verdict = 'diverges (goes to infinity)';
+    else if (Math.abs(leftLim - rightLim) < 1e-4) verdict = `≈ ${fmt((leftLim + rightLim) / 2)}`;
+    else verdict = `does not exist (left ≠ right)`;
+    out.textContent =
+      `lim (x → ${a}) ${f}\n` +
+      `Left side  (x slightly < ${a}):  ${leftStr}\n` +
+      `Right side (x slightly > ${a}):  ${rightStr}\n` +
+      `Limit: ${verdict}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+
+function fmt(v) {
+  if (typeof v !== 'number') return String(v);
+  if (!isFinite(v)) return v > 0 ? '∞' : '-∞';
+  return String(+v.toPrecision(8));
+}
+
+function calcSimplify() {
+  const out = document.getElementById('preOut');
+  try {
+    const r = math.simplify(_fn()).toString();
+    out.textContent = `Simplified:  ${r}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+function calcExpand() {
+  const out = document.getElementById('preOut');
+  try {
+    const node = math.parse(_fn());
+    // math.js doesn't have direct expand; use simplify with expansion rules
+    const rules = [
+      math.simplify.rules,
+      { l: '(n1+n2)*n3', r: 'n1*n3 + n2*n3' },
+      { l: 'n3*(n1+n2)', r: 'n3*n1 + n3*n2' },
+      { l: '(n1-n2)*n3', r: 'n1*n3 - n2*n3' },
+      { l: 'n3*(n1-n2)', r: 'n3*n1 - n3*n2' }
+    ].flat();
+    const r = math.simplify(node, rules).toString();
+    out.textContent = `Expanded:  ${r}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+function calcEvalAt() {
+  const out = document.getElementById('preOut');
+  try {
+    const at = parseFloat(document.getElementById('calcAt').value);
+    if (isNaN(at)) { out.textContent = 'Enter x value in the Derivative card'; return; }
+    const v = math.evaluate(_fn(), { x: at });
+    out.textContent = `f(${at}) = ${fmt(v)}`;
+  } catch (e) { out.textContent = 'Error: ' + e.message; }
+}
+</script>
+</body>
+</html>
